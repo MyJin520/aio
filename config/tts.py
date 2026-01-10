@@ -12,9 +12,8 @@ class TTSConfig(BaseConfig):
     service_name: str = "tts"
 
     # 模型配置
-    model_dir: str = None  # 这里应该是 Path 类型，或者需要在 __post_init__ 中转换
+    model_path: Optional[Path] = None  # 直接使用 Path 类型注解
     device: str = "cuda"
-    model_id: str = "fishaudio/openaudio-s1-mini"
     compile_model: bool = True
     decoder_ckpt_path: Optional[Path] = None
     llama_ckpt_file: Optional[Path] = None
@@ -27,21 +26,13 @@ class TTSConfig(BaseConfig):
         """后初始化处理"""
         super().__post_init__()
 
-        # 将字符串转换为 Path 对象
-        from pathlib import Path
-        import os
-
-        if isinstance(self.model_dir, str):
-            self.model_dir = Path(self.model_dir)
-
         # 设置默认模型目录（如果未提供）
-        if self.model_dir is None:
-            current_dir = Path(os.path.dirname(os.path.abspath(__file__))).parent.parent
-            self.model_dir = (current_dir / "models").resolve()
+        if self.model_path is None:
+            self.model_path = (Path(__file__).parent.parent / "tts_model").resolve()
 
         # 确保模型目录存在
-        self.model_dir.mkdir(parents=True, exist_ok=True)
+        self.model_path.mkdir(parents=True, exist_ok=True)
 
         # 设置模型文件路径
-        self.decoder_ckpt_path = self.model_dir / "codec.pth"
-        self.llama_ckpt_file = self.model_dir / "model.pth"
+        self.decoder_ckpt_path = self.model_path / "codec.pth"
+        self.llama_ckpt_file = self.model_path / "model.pth"

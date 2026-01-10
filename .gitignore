@@ -1,5 +1,5 @@
 .idea
 .venv
 logs
-fish
-funasr
+tts_model
+asr_model

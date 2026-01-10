@@ -94,7 +94,7 @@ class LoggerManager:
         loggers['error'] = error_logger
 
         # 抑制第三方库日志
-        for lib in ["funasr", "fish_speech", "torch", "werkzeug", "modelscope", "urllib3"]:
+        for lib in ["asr_model", "fish_speech", "torch", "werkzeug", "modelscope", "urllib3"]:
             logging.getLogger(lib).setLevel(logging.WARNING)
 
         # 配置werkzeug日志

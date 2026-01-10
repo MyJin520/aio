@@ -56,7 +56,6 @@ class VoiceService:
                 asr_config = ASRConfig(
                     host=self.args.host,
                     port=self.args.port,
-                    model_path=self.args.asr_model_path,
                     start_keyword=self.args.start_keyword,
                     stop_keyword=self.args.stop_keyword,
                     silence_threshold=self.args.silence_threshold,
@@ -80,9 +79,8 @@ class VoiceService:
                 tts_config = TTSConfig(
                     host=self.args.host,
                     port=self.args.tts_port or self.args.port,
-                    model_dir=self.args.tts_model_dir,
+                    model_path=self.args.tts_model_path,
                     device=self.args.device,
-                    model_id=self.args.tts_model_id,
                     compile_model=self.args.compile,
                     log_level=self.args.log_level
                 )
@@ -230,11 +228,8 @@ def parse_args():
                         help='启用TTS服务')
     parser.add_argument('--tts-port', type=int,
                         help='TTS服务端口（默认与主端口相同）')
-    parser.add_argument('--tts-model-dir', type=str,
-                        help='TTS模型目录')
-    parser.add_argument('--tts-model-id', type=str,
-                        default='fishaudio/openaudio-s1-mini',
-                        help='TTS模型ID')
+    parser.add_argument('--tts-model-path', type=str,
+                        help='TTS模型路径')
     parser.add_argument('--device', type=str, default='cuda',
                         choices=['cpu', 'cuda'],
                         help='运行设备')

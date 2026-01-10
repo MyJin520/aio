@@ -54,7 +54,7 @@ class TTSService(BaseService):
                 # 加载模型
                 self.logger.info("🔍 加载LLaMA模型...")
                 llama_queue = launch_thread_safe_queue(
-                    checkpoint_path=self.config.model_dir,
+                    checkpoint_path=self.config.model_path,
                     device=device_obj,
                     precision=dtype,
                     compile=self.config.compile_model,
@@ -196,7 +196,7 @@ class TTSService(BaseService):
             "status": "ready" if self.is_running else "not_ready",
             "service": "tts",
             "compile_enabled": self.config.compile_model,
-            "model_dir": str(self.config.model_dir),
+            "model_path": str(self.config.model_path),
             "device": self.config.device
         }
 

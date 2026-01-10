@@ -1,5 +1,6 @@
 from dataclasses import dataclass, field
 from typing import List, Optional
+from pathlib import Path
 from config import BaseConfig
 
 
@@ -15,9 +16,7 @@ class ASRConfig(BaseConfig):
     audio_channels: int = 1
 
     # 模型配置
-    model_name: str = "paraformer-zh-streaming"
-    model_revision: str = "v2.0.4"
-    model_id: str = 'iic/speech_paraformer-large_asr_nat-zh-cn-16k-common-vocab8404-online'
+    model_path: Optional[Path] = None
     required_model_files: List[str] = field(default_factory=lambda: ['config.yaml', 'model.pt', 'tokens.json'])
 
     # 识别配置
@@ -41,3 +40,12 @@ class ASRConfig(BaseConfig):
     def __post_init__(self):
         """后初始化处理"""
         super().__post_init__()
+
+        # 设置默认模型目录（如果未提供）
+        if self.model_path is None:
+            self.model_path = (Path(__file__).parent.parent / "asr_model").resolve()
+        else:
+            self.model_path = Path(self.model_path).resolve()
+
+        # 确保模型目录存在
+        self.model_path.mkdir(parents=True, exist_ok=True)
