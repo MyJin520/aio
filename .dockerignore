@@ -1,0 +1,65 @@
+# 忽略不必要的文件
+.git
+.gitignore
+.vscode
+.idea
+*.log
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.venv/
+ENV/
+env.bak/
+venv.bak/
+
+# 测试文件
+tests/
+test/
+*.test
+*.spec
+
+# 文档
+docs/
+*.md
+*.rst
+
+# 数据文件
+data/
+*.db
+*.sqlite
+
+# 模型文件（通过挂载）
+models/
+asr_model
+tts_model
+# 日志文件
+logs/
+
+# 临时文件
+temp/
+tmp/
+*.tmp
+*.temp
+
+# 系统文件
+.DS_Store
+Thumbs.db
+
+# 构建产物
+dist/
+build/
+*.egg-info/
+
+# 配置文件（可根据需要调整）
+config/development.py
+config/testing.py
+
+# 大文件
+*.pt
+*.pth
+*.bin
+*.onnx
