@@ -222,8 +222,17 @@ class ASRService(BaseService):
         stop_detected = self.config.stop_keyword in combined_text
         return start_detected, stop_detected
 
+        # 修改 _reset_recognition_state 方法，在清空音频片段之前先保存录音数据
     def _reset_recognition_state(self) -> None:
         """重置识别状态"""
+        # 保存音频
+        if self.audio_fragments:
+            AudioUtils.merge_audio_segments(
+                self.audio_fragments,
+                self.config.audio_output_path,
+                logger=self.logger
+            )
+
         self.recording_active = False
         self.listen_mode = False
         self.waiting_for_silence = False
@@ -240,6 +249,7 @@ class ASRService(BaseService):
         # 清空音频片段
         if self.audio_fragments:
             self.audio_fragments.clear()
+
 
     def _handle_silence_timeout(self, audio_chunk: np.ndarray) -> None:
         """处理静音超时"""

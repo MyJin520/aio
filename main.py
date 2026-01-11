@@ -218,7 +218,7 @@ def parse_args():
                         help='开始关键词')
     parser.add_argument('--stop-keyword', type=str, default='结束',
                         help='结束关键词')
-    parser.add_argument('--silence-threshold', type=float, default=0.001,
+    parser.add_argument('--silence-threshold', type=float, default=0.007,
                         help='静音阈值')
     parser.add_argument('--silence-timeout', type=float, default=7.0,
                         help='静音超时秒数')

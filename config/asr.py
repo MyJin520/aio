@@ -27,7 +27,7 @@ class ASRConfig(BaseConfig):
     decoder_chunk_look_back: int = 1
 
     # 静音检测
-    silence_threshold: float = 0.001
+    silence_threshold: float = 0.007
     silence_timeout_seconds: float = 7.0
 
     # SSE配置
