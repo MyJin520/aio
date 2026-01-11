@@ -217,7 +217,7 @@ class ASRService(BaseService):
 
     def _check_keywords(self) -> Tuple[bool, bool]:
         """检查文本缓冲区中是否包含开始或结束关键词"""
-        combined_text = " ".join(self.text_buffer)
+        combined_text = "".join(self.text_buffer)
         start_detected = self.config.start_keyword in combined_text
         stop_detected = self.config.stop_keyword in combined_text
         return start_detected, stop_detected
