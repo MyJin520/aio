@@ -271,6 +271,7 @@ class ASRService(BaseService):
         """处理识别状态变更"""
         if start_detected and not self.recording_active:
             self.recording_active = True
+            self.last_voice_time = time.time()
             self.logger.info(f"▶️ 检测到开始关键词: '{self.config.start_keyword}'，开始录音")
             SSEHelper.send_sse_data(self.sse_queue, 'status', 'recording_started')
 
