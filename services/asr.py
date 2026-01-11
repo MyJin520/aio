@@ -188,7 +188,20 @@ class ASRService(BaseService):
                         if not recognized_text:
                             continue
 
-                        # 关键词检测
+                        # 对于listen模式，直接开始录音而不需要开始关键字
+                        if self.listen_mode and not self.recording_active:
+                            self.recording_active = True
+                            self.last_voice_time = time.time()
+                            self.logger.info("▶️ Listen模式已启动，开始录音")
+                            SSEHelper.send_sse_data(self.sse_queue, 'status', 'recording_started')
+
+                            # 实时结果推送
+                            self.current_text = recognized_text
+                            self._log_realtime_text(recognized_text)
+                            SSEHelper.send_sse_data(self.sse_queue, 'partial', recognized_text)
+                            continue
+
+                        # 关键词检测（仅非listen模式需要）
                         self.text_buffer.append(recognized_text)
                         start_detected, stop_detected = self._check_keywords()
 
@@ -210,7 +223,6 @@ class ASRService(BaseService):
         finally:
             self._process_remaining_audio(audio_buffer)
             SSEHelper.clear_sse_queue(self.sse_queue, self.logger)
-
     def _is_silent(self, audio_chunk: np.ndarray) -> bool:
         """检测是否为静音"""
         return AudioUtils.is_silent(audio_chunk, self.config.silence_threshold)
@@ -222,7 +234,7 @@ class ASRService(BaseService):
         stop_detected = self.config.stop_keyword in combined_text
         return start_detected, stop_detected
 
-        # 修改 _reset_recognition_state 方法，在清空音频片段之前先保存录音数据
+
     def _reset_recognition_state(self) -> None:
         """重置识别状态"""
         # 保存音频
@@ -233,7 +245,11 @@ class ASRService(BaseService):
                 logger=self.logger
             )
 
+            # 保存后清空音频片段，避免重复处理
+            self.audio_fragments.clear()
+
         self.recording_active = False
+        # 保持listen_mode不变，这样可以在结束转换后自动退出listen模式
         self.listen_mode = False
         self.waiting_for_silence = False
         self.silence_timeout_ended = False
@@ -245,10 +261,6 @@ class ASRService(BaseService):
             SSEHelper.send_sse_data(self.sse_queue, 'final',
                                     " ".join(self.final_results))
             self.final_results.clear()
-
-        # 清空音频片段
-        if self.audio_fragments:
-            self.audio_fragments.clear()
 
 
     def _handle_silence_timeout(self, audio_chunk: np.ndarray) -> None:
@@ -269,12 +281,14 @@ class ASRService(BaseService):
     def _handle_recognition_state(self, start_detected: bool, stop_detected: bool,
                                   recognized_text: str) -> None:
         """处理识别状态变更"""
-        if start_detected and not self.recording_active:
+        # 非listen模式需要开始关键字
+        if not self.listen_mode and start_detected and not self.recording_active:
             self.recording_active = True
             self.last_voice_time = time.time()
             self.logger.info(f"▶️ 检测到开始关键词: '{self.config.start_keyword}'，开始录音")
             SSEHelper.send_sse_data(self.sse_queue, 'status', 'recording_started')
 
+        # listen模式或非listen模式都需要结束关键字来停止录音
         elif stop_detected and self.recording_active:
             self.recording_active = False
             self.logger.info(f"⏹️ 检测到结束关键词: '{self.config.stop_keyword}'，停止录音")

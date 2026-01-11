@@ -27,10 +27,13 @@ class ASRHandlers:
             if self.asr_service.listen_mode:
                 return jsonify({"error": "已在Listen模式中", "status": "error"}), 400
 
+            # 先重置状态，但不设置listen_mode为True
+            self.asr_service._reset_recognition_state()
+
+            # 然后设置listen_mode为True，这样就不会被_reset_recognition_state重置
             self.asr_service.listen_mode = True
             self.asr_service.listen_results.clear()
             self.asr_service.recording_active = False
-            self.asr_service._reset_recognition_state()
 
             return jsonify({
                 "message": f"Listen模式已启动，结束关键词: {self.asr_service.config.stop_keyword}",
