@@ -211,10 +211,108 @@ class ASRService(BaseService):
             self._process_remaining_audio(audio_buffer)
             SSEHelper.clear_sse_queue(self.sse_queue, self.logger)
 
-    # 其他辅助方法保持不变，但使用统一工具类
-    # _is_silent, _check_keywords, _reset_recognition_state,
-    # _handle_silence_timeout, _handle_recognition_state,
-    # _process_remaining_audio, _log_realtime_text
+    def _is_silent(self, audio_chunk: np.ndarray) -> bool:
+        """检测是否为静音"""
+        return AudioUtils.is_silent(audio_chunk, self.config.silence_threshold)
+
+    def _check_keywords(self) -> Tuple[bool, bool]:
+        """检查文本缓冲区中是否包含开始或结束关键词"""
+        combined_text = " ".join(self.text_buffer)
+        start_detected = self.config.start_keyword in combined_text
+        stop_detected = self.config.stop_keyword in combined_text
+        return start_detected, stop_detected
+
+    def _reset_recognition_state(self) -> None:
+        """重置识别状态"""
+        self.recording_active = False
+        self.listen_mode = False
+        self.waiting_for_silence = False
+        self.silence_timeout_ended = False
+        self.current_text = ""
+        self.text_buffer.clear()
+
+        # 发送结束事件
+        if self.final_results:
+            SSEHelper.send_sse_data(self.sse_queue, 'final',
+                                    " ".join(self.final_results))
+            self.final_results.clear()
+
+        # 清空音频片段
+        if self.audio_fragments:
+            self.audio_fragments.clear()
+
+    def _handle_silence_timeout(self, audio_chunk: np.ndarray) -> None:
+        """处理静音超时"""
+        if not self._is_silent(audio_chunk):
+            self.last_voice_time = time.time()
+            self.waiting_for_silence = False
+        else:
+            silence_duration = time.time() - self.last_voice_time
+            if silence_duration > self.config.silence_timeout_seconds:
+                if not self.waiting_for_silence:
+                    self.waiting_for_silence = True
+                    self.logger.info("🕐 检测到静音超时，等待结束...")
+                else:
+                    self.silence_timeout_ended = True
+                    self.logger.info("⏹️ 静音超时，自动结束识别")
+
+    def _handle_recognition_state(self, start_detected: bool, stop_detected: bool,
+                                  recognized_text: str) -> None:
+        """处理识别状态变更"""
+        if start_detected and not self.recording_active:
+            self.recording_active = True
+            self.logger.info(f"▶️ 检测到开始关键词: '{self.config.start_keyword}'，开始录音")
+            SSEHelper.send_sse_data(self.sse_queue, 'status', 'recording_started')
+
+        elif stop_detected and self.recording_active:
+            self.recording_active = False
+            self.logger.info(f"⏹️ 检测到结束关键词: '{self.config.stop_keyword}'，停止录音")
+
+            # 处理最终结果
+            if recognized_text:
+                self.final_results.append(recognized_text)
+                if self.listen_mode:
+                    self.listen_results.append(recognized_text)
+
+            # 发送最终结果
+            if self.final_results:
+                final_text = " ".join(self.final_results)
+                SSEHelper.send_sse_data(self.sse_queue, 'final', final_text)
+
+                # 保存音频
+                if self.audio_fragments:
+                    AudioUtils.merge_audio_segments(
+                        self.audio_fragments,
+                        self.config.audio_output_path,
+                        logger=self.logger
+                    )
+                    self.audio_fragments.clear()
+
+            # 重置状态
+            self._reset_recognition_state()
+
+    def _process_remaining_audio(self, audio_buffer: np.ndarray) -> None:
+        """处理剩余的音频缓冲区"""
+        if len(audio_buffer) > 0 and self.recording_active:
+            # 处理剩余的音频
+            final_text = self._process_audio_chunk(audio_buffer, is_final=True)
+            if final_text:
+                self.final_results.append(final_text)
+                final_result = " ".join(self.final_results)
+                SSEHelper.send_sse_data(self.sse_queue, 'final', final_result)
+
+                # 保存音频
+                if self.audio_fragments:
+                    AudioUtils.merge_audio_segments(
+                        self.audio_fragments,
+                        self.config.audio_output_path,
+                        logger=self.logger
+                    )
+                    self.audio_fragments.clear()
+
+    def _log_realtime_text(self, text: str) -> None:
+        """记录实时识别文本"""
+        self.logger.info(f"🎤 实时识别: {text}")
 
     def start(self) -> None:
         """启动ASR服务"""
