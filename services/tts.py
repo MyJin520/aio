@@ -145,7 +145,6 @@ class TTSService(BaseService):
         # 音频数据转换为int16
         audio_data_int16 = (audio_data * 32767).astype(np.int16)
 
-        # 使用内存流替代临时文件
         audio_stream = BytesIO()
 
         audio_segment = AudioSegment(
@@ -202,7 +201,6 @@ class TTSService(BaseService):
 
     def init_engine_compile(self):
         """初始化引擎编译（预热）"""
-        # 调用核心推理方法，使用固定文本
         audio_data, processing_time = self._inference("你好世界")
 
         audio_size_kb = len(audio_data) / 1024

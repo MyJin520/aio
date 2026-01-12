@@ -280,7 +280,6 @@ class ASRService(BaseService):
 
     def _handle_recognition_state(self, start_detected: bool, stop_detected: bool,
                                   recognized_text: str) -> None:
-        """处理识别状态变更"""
         # 非listen模式需要开始关键字
         if not self.listen_mode and start_detected and not self.recording_active:
             self.recording_active = True
@@ -383,7 +382,7 @@ class ASRService(BaseService):
             self.stop_event.set()
             self.logger.info("🛑 开始停止ASR服务...")
 
-            # 优先关闭音频流（避免新的音频输入）
+            # 优先关闭音频流
             if self.audio_stream:
                 try:
                     self.logger.info("🔇 关闭音频流...")
@@ -396,14 +395,14 @@ class ASRService(BaseService):
                 except Exception as e:
                     self.logger.warning(f"⚠️ 关闭音频流时出错: {str(e)}")
 
-            # 清空音频队列（避免线程等待新数据）
+            # 清空音频队列
             try:
                 while not self.audio_queue.empty():
                     self.audio_queue.get_nowait()
             except Exception:
                 pass
 
-            # 等待识别线程结束（使用更短的超时）
+            # 等待识别线程结束
             if self.recognition_thread and self.recognition_thread.is_alive():
                 self.logger.info("⏳ 等待识别线程结束...")
                 self.recognition_thread.join(timeout=2.0)
@@ -412,7 +411,7 @@ class ASRService(BaseService):
                 else:
                     self.logger.info("✅ 识别线程已结束")
 
-            # 异步合并音频片段（避免阻塞关闭过程）
+            # 异步合并音频片段
             if self.audio_fragments:
                 self.logger.info("🎵 异步合并音频片段...")
                 import threading

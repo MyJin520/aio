@@ -1,9 +1,3 @@
-#!/usr/bin/env python3
-"""
-AI语音服务主程序
-整合ASR（语音识别）和TTS（文本转语音）功能
-"""
-
 import signal
 import sys
 
@@ -40,7 +34,6 @@ class VoiceService:
 
     def initialize_services(self):
         """初始化服务"""
-        # 初始化日志
         self.loggers = LoggerManager.get_logger("voice_service", self.args.log_level)
         main_logger = self.loggers['main']
 
@@ -140,11 +133,7 @@ class VoiceService:
         """运行服务"""
         # 初始化服务
         self.initialize_services()
-
-        # 创建Flask应用
         app = self.create_flask_app()
-
-        # 打印启动信息
         self.print_startup_info()
 
         # 启动服务
