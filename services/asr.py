@@ -379,39 +379,70 @@ class ASRService(BaseService):
             if not self.is_running:
                 return
 
+            # 立即设置停止事件
             self.stop_event.set()
+            self.logger.info("🛑 开始停止ASR服务...")
 
-            # 关闭音频流
+            # 优先关闭音频流（避免新的音频输入）
             if self.audio_stream:
                 try:
-                    if hasattr(self.audio_stream, 'active') and self.audio_stream.active:
-                        self.audio_stream.stop()
-                    self.audio_stream.close()
-                except Exception:
-                    pass
+                    self.logger.info("🔇 关闭音频流...")
+                    if hasattr(self.audio_stream, 'stop'):
+                        self.audio_stream.stop(block=False)  # 非阻塞停止
+                    if hasattr(self.audio_stream, 'close'):
+                        self.audio_stream.close(block=False)  # 非阻塞关闭
+                    self.audio_stream = None
+                    self.logger.info("✅ 音频流已关闭")
+                except Exception as e:
+                    self.logger.warning(f"⚠️ 关闭音频流时出错: {str(e)}")
 
-            # 释放模型
+            # 清空音频队列（避免线程等待新数据）
+            try:
+                while not self.audio_queue.empty():
+                    self.audio_queue.get_nowait()
+            except Exception:
+                pass
+
+            # 等待识别线程结束（使用更短的超时）
+            if self.recognition_thread and self.recognition_thread.is_alive():
+                self.logger.info("⏳ 等待识别线程结束...")
+                self.recognition_thread.join(timeout=2.0)
+                if self.recognition_thread.is_alive():
+                    self.logger.warning("⚠️ 识别线程未在超时时间内结束，可能已被强制终止")
+                else:
+                    self.logger.info("✅ 识别线程已结束")
+
+            # 异步合并音频片段（避免阻塞关闭过程）
+            if self.audio_fragments:
+                self.logger.info("🎵 异步合并音频片段...")
+                import threading
+                merge_thread = threading.Thread(
+                    target=lambda: AudioUtils.merge_audio_segments(
+                        self.audio_fragments,
+                        self.config.audio_output_path,
+                        logger=self.logger
+                    )
+                )
+                merge_thread.daemon = True
+                merge_thread.start()
+
+            # 释放模型资源
             if self.model:
+                self.logger.info("🧠 释放模型资源...")
                 try:
                     del self.model
-                except Exception:
-                    pass
+                    self.model = None
+                    self.logger.info("✅ 模型资源已释放")
+                except Exception as e:
+                    self.logger.warning(f"⚠️ 释放模型资源时出错: {str(e)}")
 
-            # 等待线程结束
-            if self.recognition_thread:
-                self.recognition_thread.join(timeout=3.0)
-
-            # 合并音频片段
-            if self.audio_fragments:
-                AudioUtils.merge_audio_segments(
-                    self.audio_fragments,
-                    self.config.audio_output_path,
-                    logger=self.logger
-                )
-
+            # 清空SSE队列
             SSEHelper.clear_sse_queue(self.sse_queue, self.logger)
+
+            # 标记服务为已停止
             self.is_running = False
-            self.logger.info("✅ ASR服务已停止")
+            self.logger.info("✅ ASR服务已完全停止")
+
 
     def get_status(self) -> Dict[str, Any]:
         """获取服务状态"""
