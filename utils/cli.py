@@ -32,8 +32,6 @@ def parse_args():
     # TTS配置
     parser.add_argument('--enable-tts', action='store_true',
                         help='启用TTS服务')
-    parser.add_argument('--tts-port', type=int,
-                        help='TTS服务端口（默认与主端口相同）')
     parser.add_argument('--tts-model-path', type=str,
                         help='TTS模型路径')
     parser.add_argument('--device', type=str, default='cuda',

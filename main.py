@@ -70,7 +70,7 @@ class VoiceService:
                 main_logger.info("🔍 初始化TTS服务...")
                 tts_config = TTSConfig(
                     host=self.args.host,
-                    port=self.args.tts_port or self.args.port,
+                    port=self.args.port,
                     model_path=self.args.tts_model_path,
                     device=self.args.device,
                     compile_model=self.args.compile,
