@@ -28,7 +28,7 @@ class ASRConfig(BaseConfig):
 
     # 静音检测
     silence_threshold: float = 0.007
-    silence_timeout_seconds: float = 7.0
+    silence_timeout_seconds: float = 5.0
 
     # SSE配置
     sse_queue_maxsize: int = 100

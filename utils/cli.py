@@ -26,7 +26,7 @@ def parse_args():
                         help='结束关键词')
     parser.add_argument('--silence-threshold', type=float, default=0.007,
                         help='静音阈值')
-    parser.add_argument('--silence-timeout', type=float, default=7.0,
+    parser.add_argument('--silence-timeout', type=float, default=5.0,
                         help='静音超时秒数')
 
     # TTS配置
