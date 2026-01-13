@@ -387,9 +387,9 @@ class ASRService(BaseService):
                 try:
                     self.logger.info("🔇 关闭音频流...")
                     if hasattr(self.audio_stream, 'stop'):
-                        self.audio_stream.stop(block=False)  # 非阻塞停止
+                        self.audio_stream.stop()  # 非阻塞停止
                     if hasattr(self.audio_stream, 'close'):
-                        self.audio_stream.close(block=False)  # 非阻塞关闭
+                        self.audio_stream.close()  # 非阻塞关闭
                     self.audio_stream = None
                     self.logger.info("✅ 音频流已关闭")
                 except Exception as e:
