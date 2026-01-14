@@ -143,7 +143,7 @@ class VoiceService:
             sys.exit(1)
 
         main_logger = self.loggers['main']
-        main_logger.info(f"🌐 服务正在启动，监听 {self.args.host}:{self.args.port}...")
+        main_logger.info(f"🌐 服务已经启动，监听 {self.args.host}:{self.args.port}...")
 
         server_thread = threading.Thread(
             target=serve,
