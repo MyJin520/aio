@@ -21,6 +21,7 @@ class VoiceService:
         self.tts_service = None
         self.app = None
         self.loggers = None
+        self.stopping = False
 
         # 设置信号处理
         signal.signal(signal.SIGINT, self.signal_handler)
@@ -30,7 +31,8 @@ class VoiceService:
         """信号处理函数"""
         self.loggers['main'].info(f"接收到信号 {signum}，正在停止服务...")
         self.stop()
-        sys.exit(0)
+        # 让主线程处理退出，避免在信号处理器中直接退出
+        # sys.exit(0)
 
     def initialize_services(self):
         """初始化服务"""
@@ -56,8 +58,7 @@ class VoiceService:
                 )
 
                 self.asr_service = ASRService(asr_config, main_logger)
-                self.asr_service.start()
-                main_logger.info("✅ ASR服务初始化成功")
+
 
             except Exception as e:
                 main_logger.error(f"❌ ASR服务初始化失败: {e}")
@@ -86,6 +87,11 @@ class VoiceService:
                 main_logger.error(f"❌ TTS服务初始化失败: {e}")
                 if not self.args.ignore_errors:
                     raise
+
+        # 在TTS之后启动ASR
+        if self.asr_service:
+            self.asr_service.start()
+            main_logger.info("✅ ASR服务初始化成功")
 
     def create_flask_app(self):
         """创建Flask应用"""
@@ -157,6 +163,10 @@ class VoiceService:
 
     def stop(self):
         """停止服务"""
+        if self.stopping:
+            return
+        self.stopping = True
+
         main_logger = self.loggers['main'] if self.loggers else None
 
         if main_logger:
@@ -198,7 +208,8 @@ def main():
     try:
         service.run()
     except KeyboardInterrupt:
-        service.loggers['main'].info("🛑 用户中断，正在停止服务...")
+        if service.loggers and service.loggers['main']:
+            service.loggers['main'].info("🛑 用户中断，正在停止服务...")
         service.stop()
     except Exception as e:
         if service.loggers:
