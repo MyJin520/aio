@@ -17,7 +17,7 @@ def parse_args():
 
     # ASR配置
     parser.add_argument('--enable-asr', action='store_true',
-                        help='启用ASR服务')
+                        help='启用ASR服务', default=True)
     parser.add_argument('--asr-model-path', type=str,
                         help='ASR模型路径')
     parser.add_argument('--start-keyword', type=str, default='开始',
@@ -31,13 +31,13 @@ def parse_args():
 
     # TTS配置
     parser.add_argument('--enable-tts', action='store_true',
-                        help='启用TTS服务')
+                        help='启用TTS服务', default=True)
     parser.add_argument('--tts-model-path', type=str,
                         help='TTS模型路径')
     parser.add_argument('--device', type=str, default='cuda',
                         choices=['cpu', 'cuda'],
                         help='运行设备')
     parser.add_argument('--compile', action='store_true',
-                        help='启用模型编译优化')
+                        help='启用模型编译优化', default=True)
 
     return parser.parse_args()

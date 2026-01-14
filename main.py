@@ -1,5 +1,6 @@
 import signal
 import sys
+import threading
 
 from flask import Flask
 from waitress import serve
@@ -22,17 +23,20 @@ class VoiceService:
         self.app = None
         self.loggers = None
         self.stopping = False
+        self.shutdown_event = threading.Event()
 
         # 设置信号处理
         signal.signal(signal.SIGINT, self.signal_handler)
         signal.signal(signal.SIGTERM, self.signal_handler)
 
     def signal_handler(self, signum, frame):
-        """信号处理函数"""
-        self.loggers['main'].info(f"接收到信号 {signum}，正在停止服务...")
-        self.stop()
-        # 让主线程处理退出，避免在信号处理器中直接退出
-        # sys.exit(0)
+        """信号处理函数，用于触发优雅关闭"""
+        if self.loggers and self.loggers.get('main'):
+            self.loggers['main'].info(f"接收到信号 {signum}，准备关闭服务...")
+        else:
+            print(f"接收到信号 {signum}，准备关闭服务...")
+
+        self.shutdown_event.set()
 
     def initialize_services(self):
         """初始化服务"""
@@ -56,12 +60,9 @@ class VoiceService:
                     silence_timeout_seconds=self.args.silence_timeout,
                     log_level=self.args.log_level
                 )
-
                 self.asr_service = ASRService(asr_config, main_logger)
-
-
             except Exception as e:
-                main_logger.error(f"❌ ASR服务初始化失败: {e}")
+                main_logger.error(f"❌ ASR服务初始化失败: {e}", exc_info=True)
                 if not self.args.ignore_errors:
                     raise
 
@@ -77,14 +78,14 @@ class VoiceService:
                     compile_model=self.args.compile,
                     log_level=self.args.log_level
                 )
-
                 self.tts_service = TTSService(tts_config, main_logger)
                 self.tts_service.start()
                 main_logger.info("✅ TTS服务初始化成功")
                 # 初始化引擎编译
-                self.tts_service.init_engine_compile()
+                if self.args.compile:
+                    self.tts_service.init_engine_compile()
             except Exception as e:
-                main_logger.error(f"❌ TTS服务初始化失败: {e}")
+                main_logger.error(f"❌ TTS服务初始化失败: {e}", exc_info=True)
                 if not self.args.ignore_errors:
                     raise
 
@@ -95,129 +96,118 @@ class VoiceService:
 
     def create_flask_app(self):
         """创建Flask应用"""
-        main_logger = self.loggers['main']
-
         self.app = Flask(__name__)
-
         # 注册路由
-        router = VoiceServiceRouter(
+        VoiceServiceRouter(
             self.app,
             self.asr_service,
             self.tts_service,
-            main_logger
+            self.loggers['main']
         )
-
         return self.app
 
     def print_startup_info(self):
         """打印启动信息"""
         main_logger = self.loggers['main']
-
         main_logger.info("\n📡 服务信息:")
         main_logger.info(f"   访问地址: http://{self.args.host}:{self.args.port}")
         main_logger.info(f"   ASR服务: {'启用' if self.args.enable_asr else '禁用'}")
         main_logger.info(f"   TTS服务: {'启用' if self.args.enable_tts else '禁用'}")
-
         if self.args.enable_asr:
             main_logger.info("\n🎤 ASR接口:")
             main_logger.info("   GET  /asr/status      - ASR服务状态")
             main_logger.info("   POST /asr/listen      - 启动Listen模式")
             main_logger.info("   GET  /asr/stream      - 实时SSE流")
             main_logger.info("   GET  /asr/audio       - 获取录音文件")
-
         if self.args.enable_tts:
             main_logger.info("\n🎙️ TTS接口:")
             main_logger.info("   POST /tts/create      - 生成语音")
             main_logger.info("   GET  /tts/status      - TTS服务状态")
-
         main_logger.info("\n🔧 通用接口:")
         main_logger.info("   GET  /health         - 服务健康检查")
         main_logger.info("   GET  /api-info       - API信息")
         main_logger.info("=" * 60)
 
     def run(self):
-        """运行服务"""
-        # 初始化服务
-        self.initialize_services()
-        app = self.create_flask_app()
-        self.print_startup_info()
+        """初始化并运行服务，等待关闭信号"""
+        try:
+            self.initialize_services()
+            app = self.create_flask_app()
+            self.print_startup_info()
+        except Exception as e:
+            if self.loggers and self.loggers.get('main'):
+                self.loggers['main'].error(f"❌ 服务初始化失败: {e}", exc_info=True)
+            else:
+                print(f"❌ 服务初始化失败: {e}")
+            self.stop()
+            sys.exit(1)
 
-        # 启动服务
         main_logger = self.loggers['main']
         main_logger.info(f"🌐 服务正在启动，监听 {self.args.host}:{self.args.port}...")
 
-        if self.args.debug:
-            app.run(
-                host=self.args.host,
-                port=self.args.port,
-                debug=True,
-                threaded=True
-            )
-        else:
-            serve(
-                app,
-                host=self.args.host,
-                port=self.args.port,
-                threads=8
-            )
+        server_thread = threading.Thread(
+            target=serve,
+            args=(app,),
+            kwargs={'host': self.args.host, 'port': self.args.port, 'threads': 8},
+            daemon=True
+        )
+        server_thread.start()
+
+        try:
+            self.shutdown_event.wait()
+        except KeyboardInterrupt:
+            main_logger.info("⌨️ 检测到用户中断 (Ctrl+C)...")
+            self.shutdown_event.set()
+
+        main_logger.info("🚦 开始执行关闭流程...")
+        self.stop()
 
     def stop(self):
-        """停止服务"""
-        if self.stopping:
-            return
-        self.stopping = True
+        """停止所有服务"""
+        with threading.Lock():
+            if self.stopping:
+                return
+            self.stopping = True
 
         main_logger = self.loggers['main'] if self.loggers else None
-
         if main_logger:
-            main_logger.info("🛑 正在停止服务...")
+            main_logger.info("🛑 正在停止所有服务...")
 
-        # 停止ASR服务
         if self.asr_service:
             try:
+                main_logger.info("⏳ 正在停止ASR服务...")
                 self.asr_service.stop()
-                if main_logger:
-                    main_logger.info("✅ ASR服务已停止")
+                main_logger.info("✅ ASR服务已停止")
             except Exception as e:
                 if main_logger:
-                    main_logger.error(f"❌ ASR服务停止失败: {e}")
+                    main_logger.error(f"❌ ASR服务停止时发生错误: {e}", exc_info=True)
 
-        # 停止TTS服务
         if self.tts_service:
             try:
+                main_logger.info("⏳ 正在停止TTS服务...")
                 self.tts_service.stop()
-                if main_logger:
-                    main_logger.info("✅ TTS服务已停止")
+                main_logger.info("✅ TTS服务已停止")
             except Exception as e:
                 if main_logger:
-                    main_logger.error(f"❌ TTS服务停止失败: {e}")
+                    main_logger.error(f"❌ TTS服务停止时发生错误: {e}", exc_info=True)
+
+        if main_logger:
+            main_logger.info("✅ 所有服务均已停止。")
 
 
 def main():
-    """主函数"""
+    """主函数：解析参数并启动服务"""
     args = parse_args()
 
-    # 检查至少启用一个服务
     if not args.enable_asr and not args.enable_tts:
-        print("错误：至少需要启用一个服务（--enable-asr 或 --enable-tts）")
+        print("错误：必须至少启用一个服务 (--enable-asr 或 --enable-tts)")
         sys.exit(1)
 
-    # 创建并运行服务
     service = VoiceService(args)
+    service.run()
 
-    try:
-        service.run()
-    except KeyboardInterrupt:
-        if service.loggers and service.loggers['main']:
-            service.loggers['main'].info("🛑 用户中断，正在停止服务...")
-        service.stop()
-    except Exception as e:
-        if service.loggers:
-            service.loggers['main'].error(f"❌ 服务运行异常: {e}")
-        else:
-            print(f"❌ 服务运行异常: {e}")
-        service.stop()
-        sys.exit(1)
+    print("程序已成功关闭。")
+    sys.exit(0)
 
 
 if __name__ == '__main__':

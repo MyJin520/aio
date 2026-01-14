@@ -38,6 +38,7 @@ asr_model
 tts_model
 # 日志文件
 logs/
+*.txt
 
 # 临时文件
 temp/
