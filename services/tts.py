@@ -25,6 +25,7 @@ class TTSService(BaseService):
         self.tts_engine = None
         self.engine_lock = threading.Lock()
         self.initialization_error = None
+        self.stopping = False
 
     def initialize(self) -> None:
         """初始化TTS引擎"""
@@ -176,18 +177,23 @@ class TTSService(BaseService):
     def stop(self) -> None:
         """停止TTS服务"""
         with self.thread_lock:
-            if not self.is_running:
+            if not self.is_running or self.stopping:
                 return
+            self.stopping = True
 
-            # 释放资源
-            if self.tts_engine:
-                try:
-                    del self.tts_engine
-                except Exception:
-                    pass
+        # 释放资源
+        if self.tts_engine:
+            try:
+                del self.tts_engine
+                self.tts_engine = None
+                if torch.cuda.is_available():
+                    torch.cuda.empty_cache()
+                self.logger.info("🧠 TTS模型资源已释放")
+            except Exception as e:
+                self.logger.error(f"❌ 释放TTS引擎资源时出错: {e}")
 
-            self.is_running = False
-            self.logger.info("✅ TTS服务已停止")
+        self.is_running = False
+        self.logger.info("✅ TTS服务已停止")
 
     def get_status(self) -> Dict[str, Any]:
         """获取服务状态"""

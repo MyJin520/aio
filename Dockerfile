@@ -27,7 +27,7 @@ RUN pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple
 
 # 安装依赖并清理缓存，补充缺失的python音频依赖
 RUN pip install --no-cache-dir \
-    torch==2.4.0 torchvision==0.19.0 torchaudio==2.4.0 \
+    torch==2.6.0 torchvision==0.21.0 torchaudio==2.6.0 \
     --index-url https://download.pytorch.org/whl/cu124 \
     && pip install --no-cache-dir fish_speech \
     && pip install --no-cache-dir funasr \
